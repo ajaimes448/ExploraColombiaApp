@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import me.andresjaimes.exploracolombiaapp.ui.theme.ExploraColombiaAppTheme
 
 @Composable
@@ -37,6 +39,8 @@ fun LoginScreen(
     val primaryOrange = Color(0xFFE45D25)
     val lightGrayBg = Color(0xFFF8F9FE)
     val inputBg = Color(0xFFE5E5EA)
+
+    val auth = Firebase.auth
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -186,7 +190,12 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = { onLoginSuccess() },
+                    onClick = {
+
+
+
+                        onLoginSuccess()
+                              },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
