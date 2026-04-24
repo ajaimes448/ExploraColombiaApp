@@ -35,12 +35,41 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val primaryOrange = Color(0xFFE45D25)
     val lightGrayBg = Color(0xFFF8F9FE)
     val inputBg = Color(0xFFE5E5EA)
 
     val auth = Firebase.auth
+
+    // Función de login con Firebase
+    fun performLogin() {
+        if (email.isBlank() || password.isBlank()) {
+            errorMessage = "Por favor completa todos los campos"
+            return
+        }
+
+        isLoading = true
+        errorMessage = null
+
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener { task ->
+                isLoading = false
+                if (task.isSuccessful) {
+                    onLoginSuccess()
+                } else {
+                    errorMessage = when (task.exception?.message) {
+                        "There is no user record corresponding to this identifier. The user may have been deleted." ->
+                            "No existe una cuenta con este correo"
+                        "The password is invalid or the user does not have a password." ->
+                            "Contraseña incorrecta"
+                        else -> task.exception?.message ?: "Error al iniciar sesión"
+                    }
+                }
+            }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -52,14 +81,13 @@ fun LoginScreen(
                 .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Image with Rounded Corners
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
                     .clip(RoundedCornerShape(bottomStart = 60.dp, bottomEnd = 60.dp))
             ) {
-                // Placeholder for the landscape image
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -117,6 +145,23 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
             ) {
+                // Mostrar error si existe
+                if (errorMessage != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE5E5)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage!!,
+                            color = Color.Red,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 Text(
                     text = "CORREO ELECTRÓNICO",
                     fontSize = 12.sp,
@@ -124,23 +169,26 @@ fun LoginScreen(
                     color = Color.Gray
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(
+                OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = {
+                        email = it
+                        errorMessage = null
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .clip(RoundedCornerShape(28.dp)),
                     placeholder = { Text("nombre@ejemplo.com", color = Color.Gray) },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color.Gray) },
-                    colors = TextFieldDefaults.colors(
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
                         focusedContainerColor = inputBg,
-                        unfocusedContainerColor = inputBg,
-                        disabledContainerColor = inputBg,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedContainerColor = inputBg
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -161,47 +209,47 @@ fun LoginScreen(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = primaryOrange,
-                        modifier = Modifier.clickable { /* Handle forgot password */ }
+                        modifier = Modifier.clickable {
+                            // TODO: Implementar recuperación de contraseña
+                        }
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(
+                OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = {
+                        password = it
+                        errorMessage = null
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .clip(RoundedCornerShape(28.dp)),
                     placeholder = { Text("........", color = Color.Gray) },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray) },
-                    trailingIcon = { Icon(Icons.Default.Home, contentDescription = null, tint = Color.Gray) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    colors = TextFieldDefaults.colors(
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
                         focusedContainerColor = inputBg,
-                        unfocusedContainerColor = inputBg,
-                        disabledContainerColor = inputBg,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedContainerColor = inputBg
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = {
-
-
-
-                        onLoginSuccess()
-                              },
+                    onClick = { performLogin() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = PaddingValues()
+                    contentPadding = PaddingValues(),
+                    enabled = !isLoading
                 ) {
                     Box(
                         modifier = Modifier
@@ -213,10 +261,17 @@ fun LoginScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Iniciar Sesión", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Iniciar Sesión", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
+                            }
                         }
                     }
                 }
@@ -261,7 +316,9 @@ fun LoginScreen(
                     color = primaryOrange,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onNavigateToRegister() }
+                    modifier = Modifier.clickable {
+                        if (!isLoading) onNavigateToRegister()
+                    }
                 )
             }
         }
@@ -271,7 +328,7 @@ fun LoginScreen(
 @Composable
 fun SocialButton(text: String, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     OutlinedButton(
-        onClick = { /* Handle social login */ },
+        onClick = { /* TODO: Implement Google Sign-In */ },
         modifier = modifier.height(50.dp),
         shape = RoundedCornerShape(25.dp),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)

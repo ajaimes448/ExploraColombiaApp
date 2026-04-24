@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -31,15 +30,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import me.andresjaimes.exploracolombiaapp.ui.theme.ExploraColombiaAppTheme
-
 
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    modifier: Modifier = Modifier,
-    onBackClick: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -47,9 +46,94 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var acceptedTerms by remember { mutableStateOf(false) }
 
+    // Estados para manejar la autenticación
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
     val primaryOrange = Color(0xFFE45D25)
     val lightGrayBg = Color(0xFFF8F9FE)
     val inputBg = Color(0xFFE5E5EA)
+
+    val auth = Firebase.auth
+
+    // Función de validación de campos
+    fun validateInputs(): Boolean {
+        errorMessage = null
+
+        if (name.isBlank()) {
+            errorMessage = "Por favor ingresa tu nombre completo"
+            return false
+        }
+
+        if (email.isBlank()) {
+            errorMessage = "Por favor ingresa tu correo electrónico"
+            return false
+        }
+
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            errorMessage = "Por favor ingresa un correo electrónico válido"
+            return false
+        }
+
+        if (password.isBlank()) {
+            errorMessage = "Por favor ingresa una contraseña"
+            return false
+        }
+
+        if (password.length < 6) {
+            errorMessage = "La contraseña debe tener al menos 6 caracteres"
+            return false
+        }
+
+        if (password != confirmPassword) {
+            errorMessage = "Las contraseñas no coinciden"
+            return false
+        }
+
+        if (!acceptedTerms) {
+            errorMessage = "Debes aceptar los términos y condiciones"
+            return false
+        }
+
+        return true
+    }
+
+    // Función para registrar usuario en Firebase
+    fun performRegistration() {
+        if (!validateInputs()) return
+
+        isLoading = true
+        errorMessage = null
+
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener { task ->
+                isLoading = false
+                if (task.isSuccessful) {
+                    // Opcional: Actualizar el perfil del usuario con el nombre
+                    val user = auth.currentUser
+                    user?.updateProfile(
+                        com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                            .setDisplayName(name)
+                            .build()
+                    )?.addOnCompleteListener { profileTask ->
+                        if (profileTask.isSuccessful) {
+                            // Perfil actualizado correctamente
+                        }
+                    }
+                    onRegisterSuccess()
+                } else {
+                    errorMessage = when (task.exception?.message) {
+                        "The email address is already in use by another account." ->
+                            "Este correo electrónico ya está registrado"
+                        "The email address is badly formatted." ->
+                            "El formato del correo electrónico no es válido"
+                        "Password should be at least 6 characters" ->
+                            "La contraseña debe tener al menos 6 caracteres"
+                        else -> task.exception?.message ?: "Error al registrar usuario"
+                    }
+                }
+            }
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -62,21 +146,25 @@ fun RegisterScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .offset(x = (-12).dp)
+            // ✅ Header con botón de retroceso - CORREGIDO
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    tint = primaryOrange
-                )
+                IconButton(
+                    onClick = { onNavigateToLogin() }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Regresar",
+                        tint = primaryOrange
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "Explorando Colombia",
                 color = primaryOrange,
@@ -105,14 +193,35 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Mostrar mensaje de error si existe
+            if (errorMessage != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE5E5)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = errorMessage!!,
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 RegisterField(
                     label = "NOMBRE COMPLETO",
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = {
+                        name = it
+                        errorMessage = null
+                    },
                     placeholder = "Tu nombre",
                     leadingIcon = Icons.Default.Person,
-                    inputBg = inputBg
+                    inputBg = inputBg,
+                    enabled = !isLoading
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -120,10 +229,14 @@ fun RegisterScreen(
                 RegisterField(
                     label = "CORREO ELECTRÓNICO",
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = {
+                        email = it
+                        errorMessage = null
+                    },
                     placeholder = "hola@ejemplo.com",
                     leadingIcon = Icons.Default.Email,
-                    inputBg = inputBg
+                    inputBg = inputBg,
+                    enabled = !isLoading
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -131,23 +244,31 @@ fun RegisterScreen(
                 RegisterField(
                     label = "CONTRASEÑA",
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = {
+                        password = it
+                        errorMessage = null
+                    },
                     placeholder = "........",
                     leadingIcon = Icons.Default.Lock,
                     inputBg = inputBg,
-                    isPassword = true
+                    isPassword = true,
+                    enabled = !isLoading
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 RegisterField(
-                    label = "CONFIRMAR",
+                    label = "CONFIRMAR CONTRASEÑA",
                     value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
+                    onValueChange = {
+                        confirmPassword = it
+                        errorMessage = null
+                    },
                     placeholder = "........",
                     leadingIcon = Icons.Default.Refresh,
                     inputBg = inputBg,
-                    isPassword = true
+                    isPassword = true,
+                    enabled = !isLoading
                 )
             }
 
@@ -159,8 +280,11 @@ fun RegisterScreen(
             ) {
                 Checkbox(
                     checked = acceptedTerms,
-                    onCheckedChange = { acceptedTerms = it },
-                    colors = CheckboxDefaults.colors(checkedColor = primaryOrange)
+                    onCheckedChange = {
+                        if (!isLoading) acceptedTerms = it
+                    },
+                    colors = CheckboxDefaults.colors(checkedColor = primaryOrange),
+                    enabled = !isLoading
                 )
                 Text(
                     text = buildAnnotatedString {
@@ -179,13 +303,14 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { onRegisterSuccess() },
+                onClick = { performRegistration() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
+                contentPadding = PaddingValues(),
+                enabled = !isLoading
             ) {
                 Box(
                     modifier = Modifier
@@ -197,10 +322,17 @@ fun RegisterScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Registrarse", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(24.dp))
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Registrarse", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(24.dp), tint = Color.White)
+                        }
                     }
                 }
             }
@@ -231,12 +363,14 @@ fun RegisterScreen(
                 SocialButton(
                     text = "Google",
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Default.Email
+                    icon = Icons.Default.Email,
+                    enabled = !isLoading
                 )
                 SocialButton(
                     text = "Apple",
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Default.Lock
+                    icon = Icons.Default.Lock,
+                    enabled = !isLoading
                 )
             }
 
@@ -249,7 +383,9 @@ fun RegisterScreen(
                     color = primaryOrange,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onNavigateToLogin() }
+                    modifier = Modifier.clickable {
+                        if (!isLoading) onNavigateToLogin()
+                    }
                 )
             }
         }
@@ -265,7 +401,8 @@ fun RegisterField(
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
     inputBg: Color,
     modifier: Modifier = Modifier,
-    isPassword: Boolean = false
+    isPassword: Boolean = false,
+    enabled: Boolean = true
 ) {
     Column(modifier = modifier) {
         Text(
@@ -275,7 +412,7 @@ fun RegisterField(
             color = Color.Gray
         )
         Spacer(modifier = Modifier.height(8.dp))
-        TextField(
+        OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
@@ -286,15 +423,37 @@ fun RegisterField(
             leadingIcon = { Icon(leadingIcon, contentDescription = null, tint = Color.Gray) },
             visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text),
-            colors = TextFieldDefaults.colors(
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
                 focusedContainerColor = inputBg,
-                unfocusedContainerColor = inputBg,
-                disabledContainerColor = inputBg,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedContainerColor = inputBg
             ),
-            singleLine = true
+            singleLine = true,
+            enabled = enabled
         )
+    }
+}
+
+@Composable
+fun SocialButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean = true
+) {
+    OutlinedButton(
+        onClick = { /* TODO: Implement Google/Apple Sign-In */ },
+        modifier = modifier.height(50.dp),
+        shape = RoundedCornerShape(25.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+        enabled = enabled
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
