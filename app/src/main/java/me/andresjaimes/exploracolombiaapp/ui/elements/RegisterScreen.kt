@@ -1,5 +1,6 @@
-package me.andresjaimes.exploracolombiaapp
+package me.andresjaimes.exploracolombiaapp.ui.elements
 
+import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,16 +22,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
 import me.andresjaimes.exploracolombiaapp.ui.theme.ExploraColombiaAppTheme
 
@@ -70,7 +74,7 @@ fun RegisterScreen(
             return false
         }
 
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             errorMessage = "Por favor ingresa un correo electrónico válido"
             return false
         }
@@ -109,15 +113,13 @@ fun RegisterScreen(
             .addOnCompleteListener { task ->
                 isLoading = false
                 if (task.isSuccessful) {
-                    // Opcional: Actualizar el perfil del usuario con el nombre
                     val user = auth.currentUser
                     user?.updateProfile(
-                        com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                        UserProfileChangeRequest.Builder()
                             .setDisplayName(name)
                             .build()
                     )?.addOnCompleteListener { profileTask ->
                         if (profileTask.isSuccessful) {
-                            // Perfil actualizado correctamente
                         }
                     }
                     onRegisterSuccess()
@@ -146,7 +148,6 @@ fun RegisterScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ✅ Header con botón de retroceso - CORREGIDO
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -193,7 +194,6 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Mostrar mensaje de error si existe
             if (errorMessage != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE5E5)),
@@ -398,7 +398,7 @@ fun RegisterField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    leadingIcon: ImageVector,
     inputBg: Color,
     modifier: Modifier = Modifier,
     isPassword: Boolean = false,
@@ -421,7 +421,7 @@ fun RegisterField(
                 .clip(RoundedCornerShape(28.dp)),
             placeholder = { Text(placeholder, color = Color.Gray) },
             leadingIcon = { Icon(leadingIcon, contentDescription = null, tint = Color.Gray) },
-            visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+            visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color.Transparent,
@@ -439,7 +439,7 @@ fun RegisterField(
 fun SocialButton(
     text: String,
     modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     enabled: Boolean = true
 ) {
     OutlinedButton(
